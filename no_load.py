@@ -8,13 +8,13 @@ from scope import Scope
 from parameters import Ra, La, J, k, b
 
 # simulation setup
-duration = 10
+duration = 6
 dt = 1e-5
 t_values = np.arange(0, duration, dt)
 
 # create motor and refernce signal
 motor = DCMotor(Ra, La, J, k, b)
-u = SquareWave(freq=1, u_high=12, u_low=0)
+u = SquareWave(0.35, 12, 0)
 
 def simulate(dc_motor, u, t_values, x0=None):
         """
