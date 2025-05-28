@@ -3,20 +3,20 @@ import numpy as np
 class SquareWave:
     """
     Square wave signal generator.
-    Swithces between high and low voltage levels at a specified frequency.
+    Swithces between high and low signal levels at a specified frequency.
 
     Parameters:
     - freq:   frequency of the square wave [Hz]
-    - V_high: high voltage level [V]
-    - V_low:  low voltage level [V]
+    - high: high signal level
+    - low:  low signal level
 
     Methods:
     - __call__(t): evaluates the square wave at time
     """
-    def __init__(self, freq, u_high, u_low):
-        self.freq = freq        # frequency [Hz]
-        self.u_high = u_high    # high voltage level [V]
-        self.u_low = u_low      # low voltage level [V]
+    def __init__(self, freq, high, low):
+        self.freq = freq    # frequency [Hz]
+        self.high = high  # high signal level
+        self.low = low    # low signal level
 
     def __call__(self, t, pwm=0.5):
         """
@@ -28,13 +28,13 @@ class SquareWave:
         - pwm: pulse width modulation factor (default is 50%)
 
         Returns:
-        - u(t): voltage at time t [V]
+        - signal level evaluated at time t
         """
         T = 1.0 / self.freq  # period [s]
         t_mod = np.mod(t, T) # position in the period
 
         # evaluate for scalar or array input
         if isinstance(t, (float, int)):
-            return self.u_high if t_mod < (T * pwm) else self.u_low
+            return self.high if t_mod < (T * pwm) else self.low
         else:
-            return np.where(t_mod < (T * pwm), self.u_high, self.u_low)
+            return np.where(t_mod < (T * pwm), self.high, self.low)
