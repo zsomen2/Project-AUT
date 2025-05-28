@@ -5,39 +5,58 @@ class Scope:
     Contains methods to plot the results of a DC motor simulation.
     """
     @staticmethod
-    def plot(title, t, u, i, w):
+    def plot(title, t, results, u_ref=None, w_ref=None):
         """
         Plot input voltage, current, and angular velocity.
 
         Parameters:
         - t: time array
-        - u: input voltage array (can be a function or a list)
-        - i: armature current array
-        - w: angular velocity array
+        - results: simulation results containing armature voltage, current and angular velocity
+        - u_ref: reference input voltage
+        - w_ref: reference angular velocity
         """
+        u = results[0]  # armature voltage [V]
+        i = results[1]  # armature current [A]
+        w = results[2]  # angular velocity [rad/s]
+
+        if u_ref is not None and not callable(u_ref):
+            const_val = u_ref
+            u_ref = lambda t: const_val
+
+        if w_ref is not None and not callable(w_ref):
+            const_val = w_ref
+            w_ref = lambda t: const_val
 
         plt.figure(figsize=(10, 7))
 
         # input voltage
         plt.subplot(3, 1, 1)
         plt.plot(t, u, label='Input voltage u(t) [V]', color='red')
+        if u_ref is not None:
+            plt.plot(t, [u_ref(ti) for ti in t], '--',
+                     label='Reference u_ref(t) [V]', color='red')
         plt.ylabel('u(t) [V]')
+        plt.legend(loc='upper right')
         plt.grid(True)
 
         # armature current
         plt.subplot(3, 1, 2)
         plt.plot(t, i, label='Armature current i(t) [A]', color='blue')
         plt.ylabel('i(t) [A]')
+        plt.legend(loc='upper right')
         plt.grid(True)
 
         # angular velocity
         plt.subplot(3, 1, 3)
         plt.plot(t, w, label='Angular velocity ω(t) [rad/s]', color='black')
+        if w_ref is not None:
+            plt.plot(t, [w_ref(ti) for ti in t], '--',
+                     label='Reference ω_ref(t) [rad/s]', color='gray')
         plt.ylabel('ω(t) [rad/s]')
+        plt.legend(loc='upper right')
         plt.grid(True)
 
         plt.xlabel('t [s]')
-
         plt.suptitle(title)
         plt.tight_layout()
         plt.show()

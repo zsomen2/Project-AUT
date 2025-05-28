@@ -13,19 +13,19 @@ class SquareWave:
     Methods:
     - __call__(t): evaluates the square wave at time
     """
-    def __init__(self, freq, high, low):
+    def __init__(self, freq, high, low, pwm=0.5):
         self.freq = freq    # frequency [Hz]
         self.high = high  # high signal level
         self.low = low    # low signal level
+        self.pwm = pwm    # pulse width modulation factor (default is 50%)
 
-    def __call__(self, t, pwm=0.5):
+    def __call__(self, t):
         """
         Evaluate the square wave at specified time.
         Allows the instance to be called like a function.
 
         Parameters:
         - t:   time [s] (can be a scalar or an array)
-        - pwm: pulse width modulation factor (default is 50%)
 
         Returns:
         - signal level evaluated at time t
@@ -35,6 +35,6 @@ class SquareWave:
 
         # evaluate for scalar or array input
         if isinstance(t, (float, int)):
-            return self.high if t_mod < (T * pwm) else self.low
+            return self.high if t_mod < (T * self.pwm) else self.low
         else:
-            return np.where(t_mod < (T * pwm), self.high, self.low)
+            return np.where(t_mod < (T * self.pwm), self.high, self.low)

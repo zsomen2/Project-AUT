@@ -12,13 +12,13 @@ duration = 6
 dt = 1e-5
 t_values = np.arange(0, duration, dt)
 
-# create motor and refernce signal
+# create motor and reference signal
 motor = DCMotor(Ra, La, J, k, b)
-u_reference = SquareWave(0.35, 12, 0)
+u_reference = SquareWave(0.35, 12, 0, 0.5)
 
 # simulation
-u_values, i_values, w_values = Simulation.simulate(motor, u_reference, t_values)
+results = Simulation.simulate(motor, t_values, None, u_reference)
 
 # plot results
 title = "MAXON A-max 32 24 V Brushless DC Motor\nNo Load Open Loop Simulation"
-Scope.plot(title, t_values, u_values, i_values, w_values)
+Scope.plot(title, t_values, results)
