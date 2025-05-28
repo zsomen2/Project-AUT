@@ -2,19 +2,25 @@ import numpy as np
 from scipy.integrate import odeint
 
 class Simulation:
+    """
+    Methods for simulating the response of a DC motor
+
+    Methods:
+    - simulate: simulates the motor response for a given reference signal
+    """
     @staticmethod
     def simulate(dc_motor, u, t_values, x0=None):
         """
-        Simulate the motor response for the given reference signal.
+        Simulation of the motor response for the given reference signal.
 
         Parameters:
         - dc_motor: instance of DCMotor
-        - u_func: input voltage function
+        - u_func:   input voltage function
         - t_values: array of time values [s]
-        - x0: initial state [i(0), ω(0)]
+        - x0:       initial conditions [i(0), ω(0)]
 
         Returns:
-        - u_values: input voltage values
+        - u_values: armature voltage values
         - i_values: armature current values
         - w_values: angular velocity values
         """
