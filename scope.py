@@ -15,14 +15,12 @@ class Scope:
         - i: armature current array
         - w: angular velocity array
         """
-        # convert u to array if it is a function
-        u_values = u(t) if callable(u) else u
 
         plt.figure(figsize=(10, 7))
 
         # input voltage
         plt.subplot(3, 1, 1)
-        plt.plot(t, u_values, label='Input voltage u(t) [V]', color='red')
+        plt.plot(t, u, label='Input voltage u(t) [V]', color='red')
         plt.ylabel('u(t) [V]')
         plt.grid(True)
 
