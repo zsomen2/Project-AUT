@@ -15,7 +15,7 @@ t_values = np.arange(0, duration, dt)
 
 # create motor and reference signal
 motor = DCMotor(Ra, La, J, k, b)
-w_reference = SquareWave(0.2, 300, 0)
+w_reference = SquareWave(0.35, 300, 0)
 
 # controller setup
 Kp = 1       # proportional gain
@@ -26,7 +26,7 @@ u_max = 24.0 # maximum output limit [V]
 controller = PIDController(w_reference, Kp, Ki, Kd, dt, u_min, u_max)
 
 # simulation
-results = Simulation.simulate(motor, t_values, None, None, controller)
+results = Simulation.simulate_closed_loop(motor, t_values, controller, None)
 
 # plot results
 title = "MAXON A-max 32 24 V DC Motor\nClosed Loop PID Control Simulation"
