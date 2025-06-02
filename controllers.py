@@ -16,16 +16,16 @@ class PIDController:
     - calculate: calculates the PID control signal based on the feedback value
     """
     def __init__(self, setpoint, Kp, Ki, Kd, dt, y_min=float('-inf'), y_max=float('inf')):
-        self.setpoint = setpoint  # desired reference value
-        self.Kp = Kp              # proportional gain
-        self.Ki = Ki              # integral gain
-        self.Kd = Kd              # derivative gain
-        self.dt = dt              # time step duration
-        self.y_min = y_min        # minimum output limit
-        self.y_max = y_max        # maximum output limit
+        self.setpoint = setpoint if callable(setpoint) else lambda t: setpoint
+        self.Kp = Kp           # proportional gain
+        self.Ki = Ki           # integral gain
+        self.Kd = Kd           # derivative gain
+        self.dt = dt           # time step duration
+        self.y_min = y_min     # minimum output limit
+        self.y_max = y_max     # maximum output limit
 
-        self.integral = 0.0       # integral term with memory
-        self.prev_error = 0.0     # previous error for derivative calculation
+        self.integral = 0.0    # integral term with memory
+        self.prev_error = 0.0  # previous error for derivative calculation
 
     def reset(self):
         """
@@ -34,20 +34,19 @@ class PIDController:
         self.integral = 0.0
         self.prev_error = 0.0
 
-    def calculate(self, measured_value, t=None):
+    def calculate(self, measured_value, t):
         """
         Calculate the PID control signal.
 
         Parameters:
         - measured_value: current value from the system
-        - dt:             time step duration
+        - t:              current time
 
         Returns:
         - y: saturated control output signal
         """
         # calculate the error from feedback
-        ref = self.setpoint(t) if callable(self.setpoint) and t is not None else self.setpoint
-        error = ref - measured_value
+        error = self.setpoint(t) - measured_value
 
         # calculate the PID terms
         self.integral += error * self.dt
