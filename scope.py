@@ -2,26 +2,21 @@ import matplotlib.pyplot as plt
 
 class Scope:
     """
-    Contains methods to plot the results of a DC motor simulation.
+    Contains methods to plot the results of the simulation.
     """
     @staticmethod
-    def plot(title, t, results, u_ref=None, w_ref=None):
+    def plot(title, t, results, w_ref=None):
         """
         Plot input voltage, current, and angular velocity.
 
         Parameters:
         - t: time array
         - results: simulation results containing armature voltage, current and angular velocity
-        - u_ref: reference input voltage
         - w_ref: reference angular velocity
         """
         u = results[0]  # armature voltage [V]
         i = results[1]  # armature current [A]
         w = results[2]  # angular velocity [rad/s]
-
-        if u_ref is not None and not callable(u_ref):
-            const_val = u_ref
-            u_ref = lambda t: const_val
 
         if w_ref is not None and not callable(w_ref):
             const_val = w_ref
@@ -32,9 +27,6 @@ class Scope:
         # input voltage
         plt.subplot(3, 1, 1)
         plt.plot(t, u, label='Input voltage u(t) [V]', color='red')
-        if u_ref is not None:
-            plt.plot(t, [u_ref(ti) for ti in t], '--',
-                     label='Reference u_ref(t) [V]', color='red')
         plt.ylabel('u(t) [V]')
         plt.legend(loc='upper right')
         plt.grid(True)
