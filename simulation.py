@@ -5,9 +5,55 @@ class Simulation:
     Methods for simulating the response of a DC motor.
 
     Methods:
+    - simulate: dispatch simulation based on mode
     - simulate_open_loop: open-loop simulation with a reference voltage signal
     - simulate_closed_loop: closed-loop simulation with a controller
+    - simulate_cascade: cascade control simulation
     """
+    @staticmethod
+    def simulate(mode, dc_motor, duration, dt, *args):
+        """
+        Dispatch simulation based on mode.
+
+        Parameters:
+        - mode:      simulation mode
+        - dc_motor:  instance of DCMotor
+        - duration:  simulation duration [s]
+        - dt:        time step [s]
+        - *args:     additional arguments depending on mode
+
+        Returns:
+        - simulation results
+        """
+        if mode == "open":
+            u_reference = args[0]
+            x0 = args[1] if len(args) > 1 else None
+            return Simulation.simulate_open_loop(dc_motor,
+                                                 duration, dt,
+                                                 u_reference,
+                                                 x0)
+
+        elif mode == "closed":
+            controller = args[0]
+            x0 = args[1] if len(args) > 1 else None
+            return Simulation.simulate_closed_loop(dc_motor,
+                                                   duration, dt,
+                                                   controller,
+                                                   x0)
+
+        elif mode == "cascade":
+            speed_controller = args[0]
+            current_controller = args[1]
+            x0 = args[2] if len(args) > 2 else None
+            return Simulation.simulate_cascade(dc_motor,
+                                               duration, dt,
+                                               speed_controller,
+                                               current_controller,
+                                               x0)
+
+        else:
+            raise ValueError(f"Unknown simulation mode: {mode}")
+
     @staticmethod
     def simulate_open_loop(dc_motor, duration, dt, u_reference, x0=None):
         """
@@ -21,6 +67,7 @@ class Simulation:
         - x0:           initial state [i(0), w(0)]
 
         Returns:
+        - t_values: time values
         - u_values: armature voltage values
         - i_values: armature current values
         - w_values: angular velocity values
@@ -65,6 +112,7 @@ class Simulation:
         - x0:          initial state [i(0), w(0)]
 
         Returns:
+        - t_values: time values
         - u_values: armature voltage values
         - i_values: armature current values
         - w_values: angular velocity values
@@ -119,6 +167,7 @@ class Simulation:
         - x0:                  initial state [i(0), w(0)]
 
         Returns:
+        - t_values: time values
         - u_values: armature voltage values
         - i_values: armature current values
         - w_values: angular velocity values

@@ -26,7 +26,7 @@ u_max = 24.0           # maximum output limit [V]
 controller = PIDController(w_reference, Kp, Ki, Kd, freq_controller, u_min, u_max)
 
 # simulation
-results = Simulation.simulate_closed_loop(motor, duration, dt, controller, None)
+results = Simulation.simulate("closed", motor, duration, dt, controller, None)
 
 # plot results
 title = (
