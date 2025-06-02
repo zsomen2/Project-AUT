@@ -1,5 +1,30 @@
 import numpy as np
 
+class Heaviside:
+    """
+    Heaviside step signal generator.
+    Sets the signal level to a constant value after a specified delay.
+
+    Parameters:
+    - value: the constant signal level after delay
+    - delay: the time after which the signal activates
+    """
+    def __init__(self, value, delay):
+        self.value = value  # constant signal level
+        self.delay = delay  # delay before activation
+
+    def __call__(self, t):
+        """
+        Evaluate the step signal at specified time.
+
+        Parameters:
+        - t: time [s] (can be a scalar or an array)
+
+        Returns:
+        - signal level evaluated at time t
+        """
+        return self.value if t >= self.delay else 0.0
+
 class SquareWave:
     """
     Square wave signal generator.
@@ -22,7 +47,6 @@ class SquareWave:
     def __call__(self, t):
         """
         Evaluate the square wave at specified time.
-        Allows the instance to be called like a function.
 
         Parameters:
         - t: time [s] (can be a scalar or an array)
@@ -56,7 +80,6 @@ class TriangleWave:
     def __call__(self, t):
         """
         Evaluate the triangle wave at specified time.
-        Allows the instance to be called like a function.
 
         Parameters:
         - t: time [s] (can be a scalar or an array)
@@ -84,14 +107,13 @@ class SineWave:
     - offset: vertical offset (DC level)
     """
     def __init__(self, freq, amp=1.0, offset=0.0):
-        self.freq = freq
-        self.amp = amp
-        self.offset = offset
+        self.freq = freq      # frequency [Hz]
+        self.amp = amp        # amplitude
+        self.offset = offset  # vertical offset
 
     def __call__(self, t):
         """
         Evaluate the sine wave at specified time.
-        Allows the instance to be called like a function.
 
         Parameters:
         - t: time [s] (can be a scalar or an array)
