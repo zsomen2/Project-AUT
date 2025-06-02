@@ -2,8 +2,8 @@ import numpy as np
 
 from dc_motor import DCMotor
 from signals import SquareWave
-from scope import Scope
 from simulation import Simulation
+from scope import Scope
 
 from parameters import Ra, La, J, k, b
 
@@ -20,5 +20,5 @@ u_reference = SquareWave(0.35, 12, 0, 0.5)
 results = Simulation.simulate(motor, t_values, None, u_reference)
 
 # plot results
-title = "MAXON A-max 32 24 V Brushless DC Motor\nNo Load Open Loop Simulation"
+title = "MAXON A-max 32 24 V DC Motor\nNo Load Open Loop Simulation\nSquare Wave Voltage Reference"
 Scope.plot(title, t_values, results)
