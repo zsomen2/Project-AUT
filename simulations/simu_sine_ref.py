@@ -1,11 +1,9 @@
-import numpy as np
+from aut_project.dc_motor import DCMotor
+from aut_project.signals import SineWave
+from aut_project.simulation import Simulation
+from aut_project.scope import Scope
 
-from dc_motor import DCMotor
-from signals import SineWave
-from simulation import Simulation
-from scope import Scope
-
-from parameters import Ra, La, J, k, b
+from aut_project.parameters import Ra, La, J, k, b
 
 # simulation setup
 duration = 6

@@ -1,12 +1,10 @@
-import numpy as np
+from aut_project.dc_motor import DCMotor
+from aut_project.signals import Heaviside
+from aut_project.controllers import PIDController
+from aut_project.simulation import Simulation
+from aut_project.scope import Scope
 
-from dc_motor import DCMotor
-from signals import Heaviside
-from controllers import PIDController
-from simulation import Simulation
-from scope import Scope
-
-from parameters import Ra, La, J, k, b
+from aut_project.parameters import Ra, La, J, k, b
 
 # simulation setup
 duration = 0.5
@@ -21,28 +19,22 @@ Kp_speed = 0.16   # proportional gain
 Ki_speed = 4.44   # integral gain
 Kd_speed = 0      # derivative gain
 freq_speed = 1e3  # controller frequency [Hz]
-i_min = -5        # minimum output limit [A]
-i_max = 5         # maximum output limit [A]
 speed_controller = PIDController(w_reference,
                                  Kp_speed,
                                  Ki_speed,
                                  Kd_speed,
-                                 freq_speed,
-                                 i_min, i_max)
+                                 freq_speed)
 
 # current controller setup (inner loop)
 Kp_current = 1.85   # proportional gain
 Ki_current = 13280  # integral gain
 Kd_current = 0      # derivative gain
 freq_current = 1e4  # controller frequency [Hz]
-u_min = 0           # minimum output limit [V]
-u_max = 24          # maximum output limit [V]
 current_controller = PIDController(0,
                                    Kp_current,
                                    Ki_current,
                                    Kd_current,
-                                   freq_current,
-                                   u_min, u_max)
+                                   freq_current)
 
 # simulation
 results = Simulation.simulate("cascade",
@@ -51,6 +43,7 @@ results = Simulation.simulate("cascade",
                               speed_controller,
                               current_controller,
                               None)
+
 
 # plot results
 title = (

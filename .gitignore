@@ -1,2 +1,8 @@
 # python compilation files
 __pycache__/
+
+# metadata files
+*.egg-info/
+
+# distribution files
+dist/
