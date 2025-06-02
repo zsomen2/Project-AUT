@@ -11,23 +11,27 @@ from parameters import Ra, La, J, k, b
 # simulation setup
 duration = 6
 dt = 1e-5
-t_values = np.arange(0, duration, dt)
 
 # create motor and reference signal
 motor = DCMotor(Ra, La, J, k, b)
 w_reference = SquareWave(0.35, 300, 0)
 
 # controller setup
-Kp = 1       # proportional gain
-Ki = 0.5     # integral gain
-Kd = 0.05    # derivative gai
-u_min = 0.0  # minimum output limit [V]
-u_max = 24.0 # maximum output limit [V]
-controller = PIDController(w_reference, Kp, Ki, Kd, dt, u_min, u_max)
+Kp = 5.0               # proportional gain
+Ki = 0.5               # integral gain
+Kd = 0.05              # derivative gain
+freq_controller = 1e5  # controller frequency [Hz]
+u_min = 0.0            # minimum output limit [V]
+u_max = 24.0           # maximum output limit [V]
+controller = PIDController(w_reference, Kp, Ki, Kd, freq_controller, u_min, u_max)
 
 # simulation
-results = Simulation.simulate_closed_loop(motor, t_values, controller, None)
+results = Simulation.simulate_closed_loop(motor, duration, dt, controller, None)
 
 # plot results
-title = "MAXON A-max 32 24 V DC Motor\nClosed Loop PID Control Simulation"
-Scope.plot(title, t_values, results, w_reference)
+title = (
+    f"MAXON A-max 32 24 V DC Motor\n"
+    f"Closed Loop PID Control Simulation\n"
+    f"Kp: {Kp}, Ki: {Ki}, Kd: {Kd}"
+)
+Scope.plot(title, results, w_reference)
