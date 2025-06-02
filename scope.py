@@ -10,9 +10,9 @@ class Scope:
         Plot input voltage, current, and angular velocity.
 
         Parameters:
-        - t: time array
+        - t:       time array
         - results: simulation results containing armature voltage, current and angular velocity
-        - w_ref: reference angular velocity
+        - w_ref:   reference angular velocity
         """
         u = results[0]  # armature voltage [V]
         i = results[1]  # armature current [A]
