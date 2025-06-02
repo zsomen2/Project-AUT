@@ -15,12 +15,13 @@ class PIDController:
     - reset: resets the internal state
     - calculate: calculates the PID control signal based on the feedback value
     """
-    def __init__(self, setpoint, Kp, Ki, Kd, dt, y_min=float('-inf'), y_max=float('inf')):
+    def __init__(self, setpoint, Kp, Ki, Kd, freq, y_min=float('-inf'), y_max=float('inf')):
         self.setpoint = setpoint if callable(setpoint) else lambda t: setpoint
         self.Kp = Kp           # proportional gain
         self.Ki = Ki           # integral gain
         self.Kd = Kd           # derivative gain
-        self.dt = dt           # time step duration
+        self.freq = freq       # controller frequency
+        self.dt = 1/freq       # time step duration
         self.y_min = y_min     # minimum output limit
         self.y_max = y_max     # maximum output limit
 
