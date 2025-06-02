@@ -1,4 +1,4 @@
-# Parameters for the MAXON A-max 32 Brushless DC motor
+# Parameters for the MAXON A-max 32 DC motor
 Ra = 3.99           # armature resistance          [Ohm]
 La = 0.556e-3       # armature inductance          [H]
 J = 45.3e-6         # rotor inertia                [kg*m^2]
