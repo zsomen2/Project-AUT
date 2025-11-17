@@ -1,119 +1,426 @@
-﻿# Projekt dokumentáció – IPMSM alapú térorientált szabályzás
+﻿# Projekt dokumentáció – IPMSM alapú mezőorientált szabályozás
 
-## 1\. Bevezetés
+## 1. Bevezetés és célkitűzés
 
-Az 1. ábra rendszerszintű blokkvázlata mutatja, hogyan épül fel a projektben implementált háromfázisú hajtáslánc: a DC táplálásból felépített két szintű inverter szinuszos PWM-mel biztosítja a sztátor feszültségeket, amelyeket az FOC állít elő az IPMSM motor elektromágneses modellje alapján. A blokkvázlat arra is rámutat, hogy az elektromos és mechanikai tartományok különböző időléptékben viselkednek, ezért a szabályozási hurkok eltérő mintavételezéssel futnak.
+A projekt egy belső mágneses szinkron motor (IPMSM – Interior Permanent Magnet Synchronous Motor) mezőorientált szabályozásának (FOC – Field Oriented Control) numerikus szimulációjára épül. A cél egy olyan, modulárisan felépített Python-környezet kialakítása, amely:
 
-![1. ábra – Rendszerszintű blokkvázlat](foc_block_diagram.png)
-*1. ábra: A projektben implementált hajtáslánc rendszerszintű blokkvázlata.*
+* valósághű IPMSM elektromágneses és mechanikai modellt tartalmaz,
+* háromfázisú, két­szintű invertert és szinuszos PWM modulációt modellez,
+* többhurokú (sebesség + d–q áramhurkok) mezőorientált szabályozót valósít meg,
+* mezőgyengítést alkalmaz a névleges fordulatszám fölötti tartományban,
+* statikus és interaktív szimulációkat is biztosít, diagnosztikai jelrögzítéssel.
 
-A projekt célja, hogy szimuláljunk egy IPMSM motort, valós idejű mezőgyengítéssel, adaptív áramkörökkel és interaktív vizualizációval. A dokumentáció ezért végigköveti a teljes fejlesztési folyamatot a motormodelltől az inverteren át egészen a szoftverarchitektúráig, és kitér a validációs módszerekre is.
+Az 1. ábra rendszerszintű blokkvázlata mutatja, hogyan épül fel a hajtáslánc: a DC táplálású két­szintű inverter szinuszos PWM-mel állítja elő a sztátor fázisfeszültségeket, az FOC pedig a d–q tengelyű áramokból kiindulva számítja a kívánt feszültségreferenciákat. A motor elektromágneses modellje és a mechanikai alrendszer eltérő időléptékben működik, ezért a szabályozási hurkok különböző mintavételezéssel futnak.
 
-Bár a repó tartalmaz egy klasszikus egyenáramú motorra vonatkozó moduláris szimulátort is, a jelen leírás kifejezetten a belső mágneses szinkron motorra (IPMSM) fókuszál. A DC részleggel kapcsolatos elemeket csak akkor érintjük, amikor azok segítik a PMSM modell értelmezését vagy az eredmények összehasonlítását.
+<p align="center">
+  <img src="foc_block_diagram.png" alt="1. ábra - Rendszerszintű blokkvázlat">
+</p>
+<p align="center"><em>1. ábra: A projektben implementált IPMSM hajtás rendszerszintű blokkvázlata.</em></p>
 
------
+A projekt kiegészítésként tartalmaz egy DC-motorra vonatkozó szimulációs keretrendszert is, amely egyszerűbb szabályozási struktúrákkal (nyitott hurkú, egyhurkú zárt szabályozás, kaszkád szabályozás) szolgál összehasonlítási alapként. A jelen dokumentáció viszont kifejezetten az IPMSM alapú FOC hajtásra koncentrál, és csak akkor tér ki a DC-motorra, amikor az segíti a PMSM modell megértését vagy a validációt.
 
-## 2\. Rendszer- és szoftveráttekintés
+A dokumentáció célja, hogy:
 
-A `ipmsm.py` tartalmazza a motor fizikai modelljét, a `transformations.py` a Clarke–Park transzformációkat, a `pwm.py` és `inverter.py` a nagyfrekvenciás teljesítményelektronikai részt, míg a `foc.py` felel a teljes térorientált szabályozásért és a szimulációs meghajtásért (`FieldOrientedDrive`).
+* áttekintse a fizikai modellt és a matematikai leírást (állapotváltozók, differenciálegyenletek),
+* bemutassa a Clarke–Park transzformációkon alapuló mérőrendszert,
+* részletesen ismertesse a mezőorientált szabályozó felépítését,
+* elmagyarázza a mezőgyengítés működési elvét,
+* leírja a szimulációs eszközök használatát (statikus és interaktív futtatás),
+* javaslatokat adjon további fejlesztési irányokra.
 
-A `simulations` könyvtár több belépési pontot kínál: a `simu_ipmsm_foc.py` skript reprodukálja az alap hajtási manővert, míg a `simu_ipmsm_foc_interactive.py` GUI csúszkákkal teszi hangolhatóvá a PI erősítéseket, a mezőgyengítés paramétereit és a terhelőnyomatékot. E két szkript ugyanarra a magmodulokra épít, így könnyű azonosítani a hatásukat a motor és az inverter viselkedésére.
+---
 
-A DC motorokat érintő `simulation.py` modul különálló történet: a `Simulation.simulate_*` függvények egyszerű Euler-integrátorral dolgoznak, és csupán referenciaként szolgálnak ahhoz, hogy lássuk, mennyivel összetettebb egy IPMSM vezérlése. Ezen felül a PMSM-hez kapcsolódó modulok időlépés- és referencia-kezelése sokkal kifinomultabb, amit a későbbi fejezetek részletesen tárgyalnak.
+## 2. Rendszer- és szoftverarchitektúra
 
------
+A projekt főbb moduljai az `aut_project` csomagban, illetve a `simulations` könyvtárban találhatók:
 
-## 3\. Az IPMSM fizikai felépítése és paraméterei
+* `ipmsm.py` – az IPMSM motor fizikai, d–q tengelyű modellje (`IPMSMMotor`),
+* `transformations.py` – Clarke–Park és inverz transzformációk,
+* `pwm.py` – szinuszos PWM modell (`SinusoidalPWM`),
+* `inverter.py` – két­szintű háromfázisú inverter modell (`TwoLevelInverter`),
+* `foc.py` – mezőorientált szabályozó (`FieldOrientedController`), mezőgyengítés (`FieldWeakeningController`) és hajtás futtató osztály (`FieldOrientedDrive`),
+* `controllers.py` – általános PID és PI szabályozók,
+* `simulation.py`, `dc_motor.py` – DC-motor szimulációs keret (referencia, összehasonlítás).
 
-A rotorba süllyesztett ritkaföldfém mágnesek golyó alakú fluxusútvonalat hoznak létre, ami miatt a d- és q-tengely induktivitások eltérnek egymástól ($Ld \neq Lq$).
+A szimulációkhoz tartozó scriptek:
 
-A `IPMSMMotor` osztály konstruktora hat kulcsparamétert vár (`Rs`, `Ld`, `Lq`, `pole_pairs`, `psi_f`, `J`) és opcionálisan a viszkózus súrlódási tényezőt (`B`) valamint a gépre jutó külső terhelőnyomatékot (`load_torque`). Ezek a paraméterek közvetlenül jelennek meg a differenciálegyenletekben, és a kód pontosan követi a gyártói adatlapok jelöléseit, így egyszerű a laborban mért értékek becsatornázása.
+* `simulations/simu_ipmsm_foc.py` – fix paraméterekkel futó, „statikus” FOC szimuláció, grafikonokkal,
+* `simulations/simu_ipmsm_foc_interactive.py` – interaktív, csúszkákkal hangolható FOC szimulátor, valós időben frissülő görbékkel.
 
-A mechanikai alrendszert a tehetetlenségi nyomaték (`J`) és a viszkózus veszteség (`B`) reprezentálja, amelyek szorosan kapcsolódnak a hajtott terheléshez. A modell lehetővé teszi, hogy akár dinamikus terhelőnyomaték-profilt (`motor.load_torque`) állítsunk be futás közben, ami nagy segítség a járműdinamikai tesztekben.
+A belső modulok logikai kapcsolata a következő:
 
------
+* A `FieldOrientedDrive` összekapcsolja a motort (`IPMSMMotor`), az invertert (`TwoLevelInverter`) és a szabályozót (`FieldOrientedController`).
+* A `FieldOrientedController.step` a pillanatnyi fázisáramokból (`phase_currents`) Clarke–Park transzformációval számítja az (i_d, i_q) komponenseket, megoldja a sebesség és áram PI hurkokat, majd inverz Park transzformációval előállítja az alpha-beta feszültségreferenciákat.
+* A `TwoLevelInverter.apply` ezeket a $(v_\alpha, v_\beta)$ komponenseket alakítja háromfázisú feszültséggé, és meghívja a `SinusoidalPWM.apply` függvényt, amely a DC-link feszültség korlátait figyelembe véve adja vissza a tényleges fázisfeszültségeket és kitöltési tényezőket.
+* Az `IPMSMMotor.derivatives` a fázisfeszültségek alapján számítja az állapotváltozók deriváltjait, amelyekből az Euler-integrátor segítségével frissül a motor állapota.
 
-## 4\. Elektromágneses és mechanikai modell
+A DC-motorral kapcsolatos `Simulation` osztály felépítése analóg: a különböző szimulációs módok (`open`, `closed`, `cascade`) jól párhuzamba állíthatók az IPMSM FOC többhurkú szabályozási struktúrájával. Ez a kontraszt rámutat arra, hogy a PMSM hajtás lényegesen összetettebb, elsősorban a többfázisú jelrendszer, a forgó koordináta-rendszerek és a mezőgyengítés miatt.
 
-A 2. ábrán látható d–q tengelyű ekvivalens áramkörből vezetjük le a belső állapotok differenciálegyenleteit. A `IPMSMMotor.derivatives` függvény a valós időben számított feszültségkomponenseket (`v_d`, `v_q`) használja, majd a lineáris villamos köröknek megfelelően képezi a `di_d` és `di_q` deriváltakat.
+---
 
-![alt text](ipmsm_equailent_circuit.png)
-*2. ábra: Az IPMSM d-q tengelyű ekvivalens áramköre.*
+## 3. Az IPMSM topológiája, SPMSM-mel való összehasonlítás
 
-Idealizált körülmények között a modell a következő összefüggésekre támaszkodik: $di_d/dt = (v_d - Rs \cdot i_d + \omega_e \cdot L_q \cdot i_q) / L_d$ és $di_q/dt = (v_q - Rs \cdot i_q - \omega_e \cdot (L_d \cdot i_d + \psi_f)) / L_q$. Ezek az egyenletek jól mutatják, hogy a q-tengelyen fellépő feszültség az állandó mágneses fluxus miatt kölcsönösen csatolt a d-tengely áramához.
+A projektben vizsgált gép belső mágneses szinkron motor (IPMSM). Ennek fő jellemzője, hogy az állandó mágnesek a rotor belsejébe vannak süllyesztve (interior), nem pedig a rotor felületén helyezkednek el, mint a felületmágneses szinkron motoroknál (SPMSM – Surface PMSM).
 
-A villamos részhez csatlakozik a nyomatékképzés: $T_e = 1.5 \cdot p \cdot (\psi_f \cdot i_q + (L_d - L_q) \cdot i_d \cdot i_q)$. Ez az összefüggés kulcsfontosságú, mert megmutatja, hogy miért képes a mezőgyengítés megváltoztatni a nyomatékfordulat arányt.
+<p align="center">
+  <img src="ipmsm_vs_spmsm.png" alt="2. ábra - IPMSM vs. SPMSM">
+</p>
+<p align="center"><em>2. ábra: Az IPMSM és a SPMSM vázlatos összehasonlítása. IPMSM esetén a mágnesek a rotor belsejében vannak, saliens gép alakul ki.</em></p>
 
-A mechanikai alrendszerben a $J \cdot d(\omega_m)/dt = T_e - B \cdot \omega_m - T_{load}$ differenciálegyenlet írja le az átmeneti dinamikát. A modell ellentétes előjelű `load_torque` bemenete lehetővé teszi, hogy gyors terhelésváltozásokat injektáljunk a szimulációba.
+Az IPMSM esetén:
 
------
+* a rotorba süllyesztett ritkaföldfém mágnesek miatt a d- és q-tengely induktivitások eltérnek egymástól:
+  $(L_d \neq L_q)$ (szaliens gép),
+* a nyomatékképzés ezért két tagból áll: mágneses nyomaték és reluktancia nyomaték,
+* mezőgyengítésnél a d-tengely áram (fluxus) aktív szabályozásával érhető el a névleges fordulatszám feletti tartomány.
 
-## 5\. Mérési tengelyek és transzformációk
+A SPMSM esetén tipikusan $(L_d \approx L_q)$, így a reluktancia nyomaték elhanyagolható. Az IPMSM-ben viszont a reluktancia nyomaték kifejezetten kihasználható, például MTPA (Maximum Torque Per Ampere) szabályozási stratégiákkal. A jelen projekt ugyan nem tartalmaz teljes MTPA logikát, de a modell formája alkalmas lenne ilyen algoritmus kísérleti implementálására.
 
-A fázisáramokból Clarke-transzformációval (`clarke_transform`) `alpha-beta` komponenseket képzünk, majd Park-transzformációval (`park_transform`) a forgó `d-q` koordinátarendszerbe vetítjük őket.
+Az `IPMSMMotor` osztály konstruktora a következő fő paramétereket várja:
 
-A `FieldOrientedController.step` függvény elején ennek megfelelően `i_alpha`, `i_beta`, majd `i_d`, `i_q` kerül kiszámításra, miközben a rotor szöge (`theta_e`) a `IPMSMMotor` állapotából érkezik. A transzformációk inverzei (`inverse_park`, `inverse_clarke`) biztosítják, hogy a kiszámított referenciafeszültségeket vissza tudjuk alakítani a háromfázisú inverter bemenetévé.
+* `Rs` – sztátor fázisellenállás,
+* `Ld`, `Lq` – d- és q-tengelyű induktivitások,
+* `pole_pairs` – póluspárok száma,
+* `psi_f` – állandó mágneshez kapcsolódó fluxus,
+* `J` – teljes tehetetlenségi nyomaték (motor + terhelés),
+* `B` – viszkózus csillapítás (súrlódás),
+* `load_torque` – külső terhelőnyomaték.
 
-A transzformációs lánc implementációja moduláris, így a jövőben könnyen beilleszthetők szenzorfúziós algoritmusok vagy becsült rotorpozíciók is.
+A modell lehetővé teszi, hogy a `load_torque` paraméter akár futás közben is változzon, így dinamikus terhelésprofilok (pl. jármű hajtáslánc, ventilátor jelleggörbe) is szimulálhatók.
 
-## 6\. Térorientált szabályozási struktúra
+---
 
-A külső sebességhurok PI-szabályzója (`speed_controller`) lassabb időlépcsővel fut, és a referencia nyomatékot illetve az `i_q` áramkomponenst állítja elő. A belső áramhurkok (`id_controller`, `iq_controller`) jóval magasabb frekvencián mintavételeznek.
+## 4. Elektromágneses és mechanikai modell
 
-A FieldOrientedController.step függvény a d- és q-tengelyen külön PI-szabályzókat tart fenn, amelyekhez decoupling feedforward tagok társulnak. A $v_{d\_ff} = v_{d\_pi} - \omega_e \cdot L_q \cdot i_q$ és $v_{q\_ff} = v_{q\_pi} + \omega_e \cdot (L_d \cdot i_d + \psi_f)$ kifejezések biztosítják, hogy a tengelyek közötti csatolás minimális legyen, így javul a gyorsulási tranziens.
+A motor elektromágneses része a d–q tengelyű ekvivalens áramkörön alapul. A d-tengelyen a mágnes fluxusa jelenik meg a q-tengely feszültségegyenletében, míg a q-tengelyen döntően a nyomatékképzés történik.
 
-A sebességhurok által számított `i_q` referencia `_iq_ref_last` néven kerül eltárolásra, amelyhez hozzáadódik a felhasználó által adott mechanikai nyomaték-előírás (`torque_reference`). Az így kapott `_iq_total_ref` értéket követi az `iq_controller`, miközben a d-tengelyen az `id_controller` a fluxus-szabályozást végzi.
+<p align="center">
+  <img src="ipmsm_equailent_circuit.png" alt="3. ábra - d-q tengelyes ekvivalens áramkör">
+</p>
+<p align="center"><em>3. ábra: Az IPMSM d–q tengelyű ekvivalens áramköre.</em></p>
 
-Ha a `voltage_limit` alapján számított feszültségvektor meghaladná a rendelkezésre álló inverterkört, akkor a vezérlő arányosan visszaskálázza a `v_d` és `v_q` komponenseket, és a logikai jelek (`voltage_saturated`) naplózásra kerülnek.
+Az állapotvektor a `IPMSMMotor` modellben:
 
------
+$$
+x = [i_d,\ i_q,\ \omega_m,\ \theta_e]^\top
+$$
 
-## 7\. Mezőgyengítés és sebességhatár kiterjesztése
+ahol $(i_d, i_q)$ a d és q tengelyű áramok, $(\omega_m)$ a mechanikai szögsebesség, $(\theta_e)$ pedig az elektromos szög.
 
-A `FieldWeakeningController` osztály figyeli a `voltage_magnitude` értéket, és ha az meghaladja a `voltage_limit` értéket, akkor negatívabb `i_d` referencia felé tolja a parancsot.
+A d–q tengelyű feszültségegyenletek idealizált körülmények között:
 
-A mezőgyengítő szabályozóban külön támadó és elengedő erősítés szerepel (`attack_gain`, `release_gain`), hogy elkerüljük a fűrészfog-szerű viselkedést. A `deadband` paraméter határozza meg, milyen mértékű túllépést tekintünk érdemi jelnek.
+$$
+\dfrac{di_d}{dt} = \dfrac{v_d - R_s i_d + \omega_e L_q i_q}{L_d}
+$$
 
-A mezőgyengítés beavatkozásának pontját `field_weakening.dt` szerint diszkrét időlépésben frissítjük. Így biztosított, hogy a magas frekvenciájú áramhurkokba nem kerül fölösleges zaj, miközben a nagy sebességű tartományban is követni tudjuk a feszültségkorlátot.
+$$
+\dfrac{di_q}{dt} = \dfrac{v_q - R_s i_q - \omega_e (L_d i_d + \psi_f)}{L_q}
+$$
 
+ahol $(\omega_e = p \cdot \omega_m)$ az elektromos szögsebesség ($p$ a póluspárok száma). Ezek pontosan visszaköszönnek az `IPMSMMotor.derivatives` implementációjában.
 
-## 8\. Inverter és moduláció
+A villamos részhez kapcsolódó nyomatékképzés:
 
-A `SinusoidalPWM` modul a vivőfrekvenciát (`carrier_freq`) és a DC-link feszültséget (`v_dc`) paraméterként veszi fel, majd `TwoLevelInverter.apply` hívásakor generálja a pillanatnyi fázisfeszültségeket.
+$$
+T_e = 1{,}5 \cdot p \cdot \left( \psi_f i_q + (L_d - L_q) i_d i_q \right)
+$$
 
-A moduláció kimenete a `FieldOrientedDrive` eredményeiben `phase_voltages` és `duty_cycles` tömbökként is megjelenik.
+amelyben az első tag a mágneses nyomaték, a második pedig a reluktancia nyomaték. Ez a felbontás magyarázza, miért lehet az IPMSM esetén a d-tengely áramot nem csupán nullára szabályozni, hanem adott körülmények között negatív irányba tolni (mezőgyengítés, MTPA).
 
-A jövőbeli bővítésekhez a moduláris inverter-interfész lehetővé teszi például, hogy helyettesítsük a `SinusoidalPWM`-et térvektoros modulációval vagy többfázisú kiterjesztésekkel.
+A mechanikai alrendszer differenciálegyenlete:
 
+$$
+J \dfrac{d\omega_m}{dt} = T_e - B \omega_m - T_{\text{load}}
+$$
 
-## 9\. Szimulációs futtatási lánc
+ahol $(T_{\text{load}})$ a `load_torque` paraméterrel szabályozható külső terhelőnyomaték. Az `IPMSMMotor.derivatives` a fenti egyenleteket numerikusan implementálja, és `numpy` vektorokkal adja vissza a deriváltakat.
 
-Először a vezérlő kiszámítja a kívánt `alpha-beta` feszültségeket, majd az inverter előállítja a fázisfeszültségeket, végül a motor differenciálegyenleteit numerikusan integráljuk.
+A rotor szögének változása elektromos koordinátában:
 
-A kód az `np.linspace` segítségével hozza létre az idővektort, és minden iterációban Euler-lépéssel ($state = state + dt \cdot derivatives$) frissíti az állapotokat. A rotor szögét `mod 2 * pi` normalizáljuk, hogy numerikusan stabil maradjon a Park-transzformáció.
+$$
+\dfrac{d\theta_e}{dt} = \omega_e = p \cdot \omega_m
+$$
 
-A `Results` struktúra több mint egy tucat jelcsatornát tárol, köztük a `d_currents`, `q_currents`, `speed`, `torque`, `omega_ref`, `i_d_ref`, `i_q_ref`, valamint a `voltage_saturated` logikai maszkot.
+A `FieldOrientedDrive.run` metódusban a `state[3]` értéket minden lépés után $(2\pi)$ modulóval normalizáljuk, hogy numerikusan stabil maradjon a Park-transzformáció (a szinusz és koszinusz függvények argumentumaként felesleges lenne egyre nagyobb szögeket tárolni).
 
-## 10\. Tipikus szimulációs eredmények és diagnosztika
+---
 
-A 11. ábrán a `simu_ipmsm_foc.py` futásának főbb görbéi láthatók: a felső grafikonon a mechanikai sebesség és a referencia, alatta az `i_q` és `i_d` áramok referenciával, majd a fázisfeszültségek és végül az elektromágneses illetve terhelőnyomaték. Ezeket a grafikonokat a `plot_results` függvény építi fel Matplotlib segítségével.
+## 5. Koordináta-transzformációk és mérési tengelyek
 
-A futási paraméterek (48 V DC-link, 10 kHz vivő, 0.2 s futásidő, 5 us integrációs lépés) úgy  vannak megválasztva, hogy a rendszer stabilan fusson.
+A háromfázisú jelrendszer kezeléséhez a klasszikus Clarke–Park transzformációkat alkalmazzuk, amelyeket a `transformations.py` modul valósít meg.
 
-![alt text](szimuláció.png)
-*11. ábra: Tipikus szimulációs eredmények IPMSM FOC hajtásról.*
+**Clarke-transzformáció (abc → αβ):**
 
-## 11\. Interaktív hangolási felület
+$$
+\alpha = \frac{2a - b - c}{3}, \qquad
+\beta = \frac{b - c}{\sqrt{3}}
+$$
 
-A 12. ábra a `simu_ipmsm_foc_interactive.py` által létrehozott GUI képernyőt mutatja. A grafikonok alatt elhelyezett csúszkák valós időben frissítik a paramétereket (`speed_kp`, `id_ki`, `fw_attack`, stb.), és az `on_slider_change` callback minden módosítás után újraszámítja a szimulációt.
+Ez a transzformáció a háromfázisú jeleket egy kétdimenziós, állórészhez kötött, ortogonális koordináta-rendszerbe vetíti.
 
-A `PlotHandles` dataclass biztosítja, hogy minimális erőforrással frissíthetők legyenek a görbék: nem újrarajzoljuk a grafikonokat, hanem az adatsorokat cseréljük. Ez különösen fontos, mert a 12. ábra által jelzett interakciók során akár több tucat frissítés történhet másodpercenként.
+**Park-transzformáció (αβ → d q):**
 
-A reset gomb (`Button`) visszaállítja a csúszkákat a `DEFAULT_SETTINGS` szerinti értékekre, ami jó kiindulási pontot ad tanulási célú kísérletekhez. Az interaktív felület alkalmas oktatásra és szoftver-hardware in-the-loop tesztek előkészítésére is.
+$$
+d = \alpha \cos\theta + \beta \sin\theta
+$$
 
-![alt text](szimuláció_interaktív.png)
-*12. ábra: Interaktív szimulációs felület a PI erősítések és a mezőgyengítés hangolásához.*
+$$
+q = -\alpha \sin\theta + \beta \cos\theta
+$$
 
-## 12\. Továbbfejlesztési irányok
+ahol $(\theta)$ az elektromos rotor szög. A d–q rendszer a rotorhoz kötött, forgó koordináta-rendszer, ami lehetővé teszi a fluxus és nyomaték komponensek szétválasztását.
 
-A továbbfejlesztési irányok között szerepel a hőmérsékletfüggő modellparaméterek bevonása, a beágyazott firmware interfészének előkészítése, illetve egy SVPWM modul beillesztése.
+**Inverz Park és Clarke (dq → αβ → abc):**
+A feszültségreferenciákat a d–q tengelyen számítjuk, majd az `inverse_park` és `inverse_clarke` függvényekkel alakítjuk vissza háromfázisú feszültséggé, mielőtt az inverterre kerülnek.
+
+A `FieldOrientedController.step` függvény elején:
+
+* a fázisáramokból (`phase_currents`) Clarke→Park transzformációval számoljuk az $(i_d, i_q)$ értékeket,
+* a szabályozás a d–q tengelyen történik,
+* a végén a d–q feszültségeket visszaforgatjuk az állórészhez kötött αβ rendszerbe.
+
+Ez a strukturált „tengely kezelés” teszi lehetővé, hogy a háromfázisú gép szabályozásszempontból két, közel független SISO rendszerre essen szét (fluxus/d és nyomaték/q).
+
+---
+
+## 6. Térorientált szabályozási struktúra (FOC)
+
+A mezőorientált szabályozó (`FieldOrientedController`) két fő hurkot valósít meg:
+
+**Külső sebességhurok:**
+
+* bemenete a mért mechanikai sebesség $(\omega_m)$,
+* referencia a `speed_reference` jel (pl. Heaviside lépcső a `simu_ipmsm_foc.py` scriptben),
+* kimenete egy $(i_q)$ jelhez hozzájáruló nyomatékigény, amelyet a `speed_controller` PI szabályozó állít elő.
+
+**Belső d–q áramhurkok:**
+
+* d-tengelyen a fluxus referencia (`id_reference`, módosítva mezőgyengítéskor),
+* q-tengelyen az összesített $(i_q)$ referencia (sebesség PI + opcionális `torque_reference`),
+* a két PI szabályozó (`id_controller`, `iq_controller`) kimenete d–q feszültségreferencia, amelyet *decoupling* (előrecsatolási) tagokkal módosítunk.
+
+A d–q feszültség parancsok a csatoló tagokkal:
+
+$$
+v_d^{ff} = v_{d,PI} - \omega_e L_q i_q
+$$
+
+$$
+v_q^{ff} = v_{q,PI} + \omega_e (L_d i_d + \psi_f)
+$$
+
+Ez a strukturált előrekompenzáció csökkenti a d–q tengelyek közötti kölcsönhatást, így a gyors fel- és lefutási tranziens során is viszonylag szétcsatolt szabályozást érünk el.
+
+A `FieldOrientedController.step` időzítés szempontjából több frekvenciát használ:
+
+* a sebességhurok (`speed_controller.dt`) lassabb, tipikusan 2 kHz körüli,
+* az áramhurkok (`id_controller.dt`, `iq_controller.dt`) gyorsabbak, pl. 10 kHz,
+* a mezőgyengítés (`field_weakening.dt`) még ritkábban frissülhet, hogy ne vigyen zajt a gyors hurkokba.
+
+A különböző frekvenciákat a `_speed_next_update`, `_id_next_update`, `_iq_next_update` és `_fw_next_update` belső időbélyegek kezelik: az adott rész csak akkor frissül, ha az aktuális idő átlépte a következő frissítési időpontot.
+
+---
+
+## 7. Mezőgyengítés és fordulatszám-tartomány kiterjesztése
+
+A mezőgyengítés célja, hogy a rendelkezésre álló DC-link feszültség mellett is elérhető legyen a névleges fordulatszám feletti üzem. Ehhez a d-tengely áramreferenciát (azaz a fluxust) úgy módosítjuk, hogy a feszültségvektor nagysága ne lépje túl az inverter által biztosítható maximumot.
+
+Ezt a logikát a `FieldWeakeningController` valósítja meg:
+
+* `voltage_limit`: az inverter αβ síkban értelmezett feszültségkorlátja (`TwoLevelInverter.alpha_beta_limit`),
+* `attack_gain`, `release_gain`: külön „támadó” és „elengedő” erősítés, hogy az $(i_d)$ referencia ne oszcilláljon túlzottan,
+* `deadband`: holtsáv, amely meghatározza, hogy mekkora eltérést tekintünk érdemi túllépésnek vagy tartaléknak,
+* `id_min`, `id_max`: biztonságos tartomány a d-tengely áramra (mezőgyengítés tipikusan negatív $(i_d)$ felé tolja a parancsot).
+
+A mezőgyengítés menete:
+
+* A FOC kiszámítja a d–q feszültségparancsot $(v_d^{ff}, v_q^{ff})$, amelyhez tartozik egy $(|v| = \sqrt{v_d^2 + v_q^2})$ nagyság.
+* Ha $(|v|)$ megközelíti vagy meghaladja a `voltage_limit` értéket, a `FieldWeakeningController.update` a `base_id`-től negatívabb $(i_d) $ parancs felé tolja a belső `_id_cmd` értéket.
+* Ha a feszültség tartalékkal a limit alatt van, a `release_gain` segítségével a mezőgyengítés „elengedi” a d-tengely áramot, fokozatosan visszatérve a bázis értékhez.
+
+Az aktuális $(i_d)$ referencia a FOC-ban `_id_ref_cmd` néven szerepel, és ebből képződik a d-tengely PI szabályozó referenciajele.
+
+A mezőgyengítés frissítése `field_weakening.dt` időközönként történik, ami jó kompromisszum a reagálási sebesség és a jelzaj között.
+
+---
+
+## 8. Inverter és szinuszos PWM modell
+
+A teljesítményelektronikai rész két fő komponensből áll:
+
+### Szinuszos PWM modell (`SinusoidalPWM`)
+
+Bemenet: kívánt fázisfeszültség `v_ref` és a DC-link feszültség `vdc`.
+
+A modell a feszültséget $(\pm v_{dc}/2)$ tartományra korlátozza:
+
+$$
+v_{\text{actual}} = \text{clip}\left(v_{\text{ref}}, -\tfrac{1}{2}v_{dc}, \tfrac{1}{2}v_{dc}\right)
+$$
+
+A kitöltési tényező:
+
+$$
+d = 0{,}5 + \frac{v_{\text{actual}}}{v_{dc}}
+$$
+
+majd 0 és 1 között korlátozva.
+
+A `voltage_limit` property egyszerűen `0.5 * vdc`, ami megfelel a szinuszos PWM feszültségkorlátjának.
+
+### Két­szintű inverter modell (`TwoLevelInverter`)
+
+Bemenet: $(v_\alpha, v_\beta)$ feszültség referenciák és az idő `t`.
+
+* Először inverz Clarke-transzformációval három fázisreferenciát képez:
+  $(v_a^{\text{ref}}, v_b^{\text{ref}}, v_c^{\text{ref}})$.
+* Mindegyik fázisra meghívja a PWM modellt (`pwm.apply`), így megkapja a tényleges fázisfeszültségeket és a duty-kat.
+* Az `alpha_beta_limit` property innen adja tovább a PMSM szabályozó felé a feszültségvektor αβ síkban érvényes korlátját, amit a mezőgyengítő is használ.
+
+A jelenlegi megvalósítás ideális elemekkel dolgozik (nincs holtidő, nincs félvezető veszteség, nincs holtidő kompenzáció), ami tiszta felületet biztosít a szabályozási algoritmusok vizsgálatára. Ugyanakkor az inverter interfész elegendően moduláris ahhoz, hogy a jövőben SVPWM, többfázisú inverter vagy nemideális modell is beilleszthető legyen.
+
+---
+
+## 9. Szimulációs futtató lánc és numerikus integráció
+
+A szimulációs alapot a `FieldOrientedDrive` osztály adja, amely:
+
+* egy adott motor példányt (`IPMSMMotor`),
+* egy inverter példányt (`TwoLevelInverter`),
+* és egy controller példányt (`FieldOrientedController`)
+
+kap a konstruktorban. A `run(duration, dt, x0=None)` függvény:
+
+* Létrehozza az idővektort:
+  `t_values = np.linspace(0.0, duration, steps, endpoint=False)`,
+  ahol `steps = int(duration / dt)`.
+* Inicializálja a motor állapotát (`motor.initial_state()`), vagy a felhasználó által megadott `x0` szerint.
+* Előkészít egy `results` szótárat, amely többek között a következőket tárolja:
+
+  * `time`, `phase_voltages`, `phase_currents`,
+  * `d_currents`, `q_currents`,
+  * `speed`, `electrical_angle`,
+  * `torque`, `torque_ref`, `load_torque`,
+  * `i_d_ref`, `i_q_ref`, `omega_ref`,
+  * `voltage_magnitude`, `voltage_saturated`,
+  * `duty_cycles`.
+
+Minden időlépésben:
+
+* meghívja a `controller.step` függvényt, amely visszaadja a kívánt `v_alpha_beta` feszültségeket és egy `debug` szótárat,
+* az inverterből (`inverter.apply`) megkapja a tényleges fázisfeszültségeket és duty-okat,
+* a motor differenciálegyenleteit (`motor.derivatives`) felhasználva Euler-lépéssel frissíti az állapotot,
+* normalizálja az elektromos szöget: `state[3] = np.mod(state[3], 2.0 * np.pi)`,
+* visszaszámítja a fázisáramokat (`motor.phase_currents`),
+* kiszámítja az elektromágneses nyomatékot (`motor.electromagnetic_torque`),
+* eltárolja az összes releváns jelet a `results` struktúrában.
+
+A `simu_ipmsm_foc.py` script konkrét szimulációt épít erre:
+
+```python
+motor = IPMSMMotor(
+    Rs=0.35,
+    Ld=1.4e-3,
+    Lq=2.6e-3,
+    pole_pairs=4,
+    psi_f=0.055,
+    J=8.5e-4,
+    B=2e-4,
+    load_torque=0.2,
+)
+pwm = SinusoidalPWM(vdc=48.0, carrier_freq=10_000.0)
+inverter = TwoLevelInverter(vdc=48.0, pwm=pwm)
+speed_reference = Heaviside(value=50.0, delay=0.02)
+```
+
+A PI erősítéseket úgy választjuk meg, hogy stabil átmenetet és elfogadható túllendülést kapjunk, miközben a mezőgyengítés szükség esetén bekapcsol. A futtatás végén egy Matplotlib alapú `plot_results` funkció rajzolja ki a sebesség, áramok, feszültségek és nyomaték görbéit.
+
+A tipikus futtatási paraméterek:
+
+* `vdc = 48 V`,
+* `carrier_freq = 10 kHz`,
+* `duration ≈ 0.15–0.2 s`,
+* `dt = 5e-6…2e-5 s`,
+
+olyan kompromisszumot jelentenek, amely mellett a modell numerikusan stabil, és a fontos dinamikák (PWM, áramhurkok, sebesség hurok) is kellő felbontással láthatók.
+
+---
+
+## 10. Interaktív FOC hangoló felület
+
+A `simu_ipmsm_foc_interactive.py` script egy Matplotlib alapú GUI-t hoz létre csúszkákkal, amelyekkel menet közben állíthatók a szabályozó paraméterei:
+
+* sebesség PI: `speed_kp`, `speed_ki`,
+* d-tengely PI: `id_kp`, `id_ki`,
+* q-tengely PI: `iq_kp`, `iq_ki`,
+* mezőgyengítés: `fw_attack`, `fw_release`,
+* referenciajel: `speed_ref`,
+* terhelés: `load_torque`.
+
+A `SLIDER_SPECS` lista az egyes csúszkák címkéit és minimum/maximum tartományát definiálja. A `build_drive` függvény a paraméterekből újraépíti a hajtást (motor + inverter + FOC), a `run_simulation` pedig lefuttatja a szimulációt.
+
+A grafikonok kezelését a `PlotHandles` dataclass egyszerűsíti: a vonalobjektumokat (sebesség, áramok, feszültségek, nyomatékok) egyszer inicializáljuk, utána csak az adatokat frissítjük. Ez sokkal hatékonyabb, mint minden változtatásnál újra létrehozni az ábrákat.
+
+<p align="center">
+  <img src="szimuláció_interaktív.png" alt="4. ábra - Interaktív FOC GUI">
+</p>
+<p align="center"><em>4. ábra: Interaktív szimulációs felület a PI erősítések és a mezőgyengítés hangolásához.</em></p>
+
+---
+
+## 11. Tipikus szimulációs eredmények és diagnosztika
+
+A statikus szimuláció (`simu_ipmsm_foc.py`) eredményeit a `plot_results` függvény jeleníti meg, jellemzően négy egymás alatti diagramon:
+
+**Sebesség és sebesség referencia:**
+
+* várható, hogy a sebesség $(\omega_m)$ néhány tizedmásodpercen belül követi a Heaviside referencia lépcsőt,
+* túllendülés, beállási idő, stacionárius hiba a `speed_kp`, `speed_ki` paraméterekkel hangolható.
+
+**d–q áramok és referenciaik:**
+
+* az $(i_q)$ áram követi a nyomaték és sebességigény által meghatározott `i_q_ref` jelet,
+* az $(i_d)$ általában egy konstans vagy mezőgyengítéskor kissé negatív érték körül szabályozott.
+
+**Fázisfeszültségek:**
+
+* a három fázisfeszültség szinuszszerű, egymáshoz képest 120° fázistolással,
+* a mezőorientált szabályozás révén a feszültségvektor forgó, közel kör alakú pályát ír le az αβ síkban.
+
+**Elektromágneses és terhelő nyomaték:**
+
+* a `torque` görbe követi a terhelő nyomatékot (`load_torque`),
+* gyors terhelésváltásnál jól láthatók a szabályozási tranziens jelenségek.
+
+<p align="center">
+  <img src="szimuláció.png" alt="5. ábra - Tipikus FOC szimulációs eredmények">
+</p>
+<p align="center"><em>5. ábra: Tipikus szimulációs eredmények az IPMSM FOC hajtásról.</em></p>
+
+A DC-motoros `Simulation` modul eredményeivel összehasonlítva jól látható, hogy az IPMSM FOC esetén sokkal több jelre és összetettebb diagnosztikai eszköztárra van szükség, ugyanakkor a mezőorientált szabályozás cserébe rendkívül precíz nyomaték- és sebességszabályozást tesz lehetővé.
+
+---
+
+## 12. Összegzés és továbbfejlesztési irányok
+
+A projekt egy kompakt, de szakmailag jól strukturált IPMSM FOC szimulációs környezetet valósít meg. A fő erősségek:
+
+* **Tiszta modellstruktúra:**
+  külön modulokra bontott motor, inverter, PWM, transzformációk és szabályozók.
+* **Valósághű IPMSM modell:**
+  szaliens gép $(L_d \neq L_q)$, reluktancia nyomaték, mezőgyengítési lehetőség.
+* **Rugalmasság:**
+  könnyen módosíthatók a motorparaméterek, a szabályozási erősítések és terhelésprofilok.
+* **Interaktív hangolás:**
+  a GUI-val nagyon rövid idő alatt megtapasztalhatók a PI erősítések, a mezőgyengítés vagy a terhelésváltozások hatásai.
+
+Lehetséges továbbfejlesztési irányok:
+
+* **MTPA és fejlettebb szabályozási stratégiák:**
+  az IPMSM modell alkalmas MTPA jellegmezők, hatásos/teljesítményoptimalizáló szabályozás, vagy akár fluxus-optimalizálás vizsgálatára.
+* **SVPWM és nemideális inverter modell:**
+  térerővektoros moduláció (SVPWM) beépítésével növelhető a kihasználható feszültségvektor tartomány; nemideális kapcsolók, holtidő és feszültségveszteségek modellje közelebb hozná a rendszert a valóságos hajtásokhoz.
+* **Szenzormentes szabályozás:**
+  rotorpozíció- és sebességbecslők (pl. EMF-alapú, observer-alapú módszerek) beépítése a transzformációs láncba.
+* **Hőmérsékletfüggő paraméterek:**
+  ellenállás, induktivitások és mágneses fluxus hőmérsékletfüggésének modellezése, ami a gyakorlati hajtásoknál kritikus jelentőségű.
